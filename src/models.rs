@@ -2,11 +2,11 @@
 pub struct Transaction {
     pub(crate) id: u32,
     pub(crate) client_id: ClientId,
-    pub(crate) record_type: TransactionType,
+    pub(crate) transaction_type: TransactionType,
     pub(crate) amount: Option<f64>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TransactionType {
     Deposit,
     Withdrawal,

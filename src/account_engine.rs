@@ -29,3 +29,138 @@ pub fn generate_accounts_summary() -> HashMap<ClientId, Account> {
         .map(|accounts| accounts.clone())
         .expect("Error locking client accounts")
 }
+
+#[cfg(test)]
+mod account_tests {
+    use sequential_test::sequential;
+
+    use super::*;
+
+    fn clear_account_data() {
+        let mut accounts = CLIENT_ACCOUNTS.lock().unwrap();
+        accounts.clear();
+    }
+
+    fn get_account(client_id: ClientId) -> Account {
+        let accounts = CLIENT_ACCOUNTS.lock().unwrap();
+        accounts.get(&client_id).unwrap().clone()
+    }
+
+    #[test]
+    #[sequential]
+    fn test_update_account() {
+        clear_account_data();
+
+        // given
+        let client_id = 1;
+        let account_function = |account: &mut Account| {
+            account.available += 10.;
+            account.total += 10.;
+        };
+
+        // when
+        update_account(client_id, account_function);
+
+        let account = get_account(client_id);
+
+        // then
+        assert_eq!(account.available, 10.);
+        assert_eq!(account.total, 10.);
+    }
+
+    #[test]
+    #[sequential]
+    fn test_update_account_sequential() {
+        clear_account_data();
+
+        // given
+        let client_id = 1;
+        let account_function = |account: &mut Account| {
+            account.available += 10.;
+            account.total += 10.;
+        };
+
+        // when
+        update_account(client_id, account_function);
+        update_account(client_id, account_function);
+
+        let account = get_account(client_id);
+
+        // then
+        assert_eq!(account.available, 20.);
+        assert_eq!(account.total, 20.);
+    }
+
+    #[test]
+    #[sequential]
+    fn test_update_account_multiple_accounts() {
+        clear_account_data();
+
+        // given
+        let first_client_id = 1;
+        let second_client_id = 2;
+
+        let account_function = |account: &mut Account| {
+            account.available += 10.;
+            account.total += 10.;
+        };
+
+        // when
+        update_account(first_client_id, account_function);
+        update_account(second_client_id, account_function);
+
+        let first_account = get_account(first_client_id);
+        let second_account = get_account(second_client_id);
+
+        // then
+        assert_eq!(first_account.available, 10.);
+        assert_eq!(second_account.available, 10.);
+    }
+
+    #[test]
+    #[sequential]
+    fn test_update_account_lock() {
+        clear_account_data();
+
+        // given
+        let client_id = 1;
+        let lock_function = |account: &mut Account| {
+            account.available += 10.;
+            account.locked = true;
+        };
+        let increment_function = |account: &mut Account| {
+            account.available += 10.;
+        };
+
+        // when
+        update_account(client_id, lock_function);
+        update_account(client_id, increment_function);
+
+        let account = get_account(client_id);
+
+        // then
+        assert_eq!(account.available, 10.);
+    }
+
+    #[test]
+    #[sequential]
+    fn test_generate_accounts_summary() {
+        clear_account_data();
+
+        // given
+        let client_id = 1;
+        let account_function = |account: &mut Account| {
+            account.available += 10.;
+            account.total += 10.;
+        };
+
+        // when
+        update_account(client_id, account_function);
+        let accounts_summary = generate_accounts_summary();
+
+        // then
+        assert_eq!(accounts_summary.len(), 1);
+        assert_eq!(accounts_summary.get(&client_id).unwrap().available, 10.);
+        assert_eq!(accounts_summary.get(&client_id).unwrap().total, 10.);
+    }
+}

@@ -16,7 +16,7 @@ where
     I: IntoIterator<Item = Transaction>,
 {
     for transaction in transactions {
-        match transaction.record_type {
+        match transaction.transaction_type {
             TransactionType::Deposit => handle_deposit(&transaction),
             TransactionType::Withdrawal => handle_withdrawal(&transaction),
             TransactionType::Dispute => handle_dispute(&transaction),
@@ -96,4 +96,102 @@ fn commit_transaction(transaction: Transaction) {
             transactions.insert(transaction.id, transaction);
         })
         .expect("Error locking transactions");
+}
+
+#[cfg(test)]
+mod transaction_tests {
+    use super::*;
+
+    fn clear_transaction_data() {
+        let mut transactions = TRANSACTIONS.lock().unwrap();
+        transactions.clear();
+    }
+
+    fn get_transactions() -> Vec<Transaction> {
+        let transactions = TRANSACTIONS.lock().unwrap();
+        transactions.values().cloned().collect()
+    }
+
+    #[test]
+    fn test_single_transaction() {
+        clear_transaction_data();
+
+        // given
+        let transaction = Transaction {
+            id: 1,
+            client_id: 1,
+            transaction_type: TransactionType::Deposit,
+            amount: Some(10.),
+        };
+
+        let transactions = vec![transaction];
+
+        // when
+        process_transactions(transactions);
+
+        let process_transactions = get_transactions();
+
+        // then
+        assert_eq!(process_transactions.len(), 1);
+    }
+
+    #[test]
+    fn test_multiple_transactions() {
+        clear_transaction_data();
+
+        // given
+        let transaction_one = Transaction {
+            id: 1,
+            client_id: 1,
+            transaction_type: TransactionType::Deposit,
+            amount: Some(10.),
+        };
+
+        let transaction_two = Transaction {
+            id: 2,
+            client_id: 1,
+            transaction_type: TransactionType::Deposit,
+            amount: Some(10.),
+        };
+
+        let transactions = vec![transaction_one, transaction_two];
+
+        // when
+        process_transactions(transactions);
+
+        let process_transactions = get_transactions();
+
+        // then
+        assert_eq!(process_transactions.len(), 2);
+    }
+
+    #[test]
+    fn test_multiple_transactions_duplicates() {
+        clear_transaction_data();
+
+        // given
+        let transaction_one = Transaction {
+            id: 1,
+            client_id: 1,
+            transaction_type: TransactionType::Deposit,
+            amount: Some(10.),
+        };
+
+        let transaction_two = Transaction {
+            id: 1,
+            client_id: 1,
+            transaction_type: TransactionType::Deposit,
+            amount: Some(10.),
+        };
+
+        let transactions = vec![transaction_one, transaction_two];
+
+        // when
+        process_transactions(transactions);
+
+        let process_transactions = get_transactions();
+
+        // then
+        assert_eq!(process_transactions.len(), 1);
+    }
 }

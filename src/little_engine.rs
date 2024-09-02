@@ -1,3 +1,5 @@
+use std::io::stdout;
+
 use crate::account_engine::generate_accounts_summary;
 use crate::export_engine::export_accounts_as_csv;
 use crate::ingestion_engine::parse_transactions_from_csv;
@@ -10,5 +12,5 @@ pub fn process_transactions_from_csv_file(csv_path: String) {
 
     let account_summary = generate_accounts_summary();
 
-    export_accounts_as_csv(account_summary);
+    export_accounts_as_csv(account_summary, stdout());
 }
