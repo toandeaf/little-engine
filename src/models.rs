@@ -4,6 +4,7 @@ pub struct Transaction {
     pub(crate) client_id: ClientId,
     pub(crate) transaction_type: TransactionType,
     pub(crate) amount: Option<f64>,
+    pub(crate) is_disputed: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

@@ -32,7 +32,6 @@ pub fn export_accounts_as_csv<W: Write>(accounts: HashMap<ClientId, Account>, wr
     csv_writer.flush().expect("Error flushing CSV writer");
 }
 
-// TODO rework this
 fn format_float(value: f64) -> String {
     if value.fract() == 0.0 {
         format!("{:.0}", value)

@@ -51,6 +51,7 @@ fn parse_number_arguments_and_create_transaction(
             client_id: client,
             id: transaction_id,
             amount: Some(amount),
+            is_disputed: false,
         });
     }
 
@@ -59,6 +60,7 @@ fn parse_number_arguments_and_create_transaction(
         client_id: client,
         id: transaction_id,
         amount: None,
+        is_disputed: false,
     })
 }
 

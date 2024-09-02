@@ -9,15 +9,16 @@ lazy_static! {
     pub static ref CLIENT_ACCOUNTS: Mutex<HashMap<ClientId, Account>> = Mutex::new(HashMap::new());
 }
 
-pub fn update_account(client_id: ClientId, account_function: impl Fn(&mut Account)) {
+pub fn update_account(client_id: ClientId, account_update_func: impl Fn(&mut Account)) {
     CLIENT_ACCOUNTS
         .lock()
         .map(|mut accounts| {
             let account = accounts.entry(client_id).or_insert_with(Account::new);
 
-            // TODO - is this necessary? Wasn't mentioned in the specs but feels like it should be
+            // Assumption: An account can't be updated when it's locked. This isn't mentioned in the
+            // spec but feels like a reasonable take on expected functionality.
             if !account.locked {
-                account_function(account);
+                account_update_func(account);
             }
         })
         .expect("Error locking client accounts");
@@ -35,16 +36,6 @@ mod account_tests {
     use sequential_test::sequential;
 
     use super::*;
-
-    fn clear_account_data() {
-        let mut accounts = CLIENT_ACCOUNTS.lock().unwrap();
-        accounts.clear();
-    }
-
-    fn get_account(client_id: ClientId) -> Account {
-        let accounts = CLIENT_ACCOUNTS.lock().unwrap();
-        accounts.get(&client_id).unwrap().clone()
-    }
 
     #[test]
     #[sequential]
@@ -162,5 +153,15 @@ mod account_tests {
         assert_eq!(accounts_summary.len(), 1);
         assert_eq!(accounts_summary.get(&client_id).unwrap().available, 10.);
         assert_eq!(accounts_summary.get(&client_id).unwrap().total, 10.);
+    }
+
+    fn clear_account_data() {
+        let mut accounts = CLIENT_ACCOUNTS.lock().unwrap();
+        accounts.clear();
+    }
+
+    fn get_account(client_id: ClientId) -> Account {
+        let accounts = CLIENT_ACCOUNTS.lock().unwrap();
+        accounts.get(&client_id).unwrap().clone()
     }
 }
