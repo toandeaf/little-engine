@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 
-use crate::account_engine::update_account;
+use crate::engines::account_engine::update_account;
 use crate::models::{Transaction, TransactionId, TransactionType};
 
 lazy_static! {
