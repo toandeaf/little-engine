@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -32,7 +33,14 @@ where
                 TransactionType::Resolve => self.handle_resolve(&transaction),
                 TransactionType::Chargeback => self.handle_chargeback(&transaction),
             }
-            commit_transaction(transaction);
+            match transaction.transaction_type {
+                // Assumption: Anything other than deposits or withdrawals are not considered true "transactions"
+                // given that their tx ID field references another transaction other than their own.
+                TransactionType::Deposit | TransactionType::Withdrawal => {
+                    commit_transaction(transaction)
+                }
+                _ => {}
+            }
         }
     }
 }
@@ -59,6 +67,10 @@ where
         self.account_engine
             .update_account(transaction.client_id, |account| {
                 if let Some(amount) = transaction.amount {
+                    if account.available < amount {
+                        return;
+                    }
+
                     account.available -= amount;
                     account.total -= amount;
                 }
@@ -66,11 +78,13 @@ where
     }
 
     fn handle_dispute(&self, transaction: &Transaction) {
-        let dispute_transaction_opt = fetch_transaction(transaction.id);
-        if let Some(dispute_transaction) = dispute_transaction_opt {
-            if let Some(amount) = dispute_transaction.amount {
+        let tx_to_dispute_opt =
+            fetch_and_update_transaction_disputed_state(transaction.id, TransactionType::Dispute);
+
+        if let Some(tx_to_dispute) = tx_to_dispute_opt {
+            if let Some(amount) = tx_to_dispute.amount {
                 self.account_engine
-                    .update_account(transaction.client_id, |account| {
+                    .update_account(tx_to_dispute.client_id, |account| {
                         account.available -= amount;
                         account.held += amount;
                     });
@@ -79,11 +93,13 @@ where
     }
 
     fn handle_resolve(&self, transaction: &Transaction) {
-        let dispute_transaction_opt = fetch_transaction(transaction.id);
-        if let Some(dispute_transaction) = dispute_transaction_opt {
-            if let Some(amount) = dispute_transaction.amount {
+        let tx_to_resolve_opt =
+            fetch_and_update_transaction_disputed_state(transaction.id, TransactionType::Resolve);
+
+        if let Some(tx_to_resolve) = tx_to_resolve_opt {
+            if let Some(amount) = tx_to_resolve.amount {
                 self.account_engine
-                    .update_account(transaction.client_id, |account| {
+                    .update_account(tx_to_resolve.client_id, |account| {
                         account.available += amount;
                         account.held -= amount;
                     });
@@ -92,27 +108,69 @@ where
     }
 
     fn handle_chargeback(&self, transaction: &Transaction) {
-        self.account_engine
-            .update_account(transaction.client_id, |account| {
-                if let Some(amount) = transaction.amount {
-                    account.held -= amount;
-                    account.total -= amount;
-                    account.locked = true;
-                }
-            });
+        let tx_to_chargeback_opt = fetch_and_update_transaction_disputed_state(
+            transaction.id,
+            TransactionType::Chargeback,
+        );
+
+        if let Some(tx_to_chargeback) = tx_to_chargeback_opt {
+            if let Some(amount) = tx_to_chargeback.amount {
+                self.account_engine
+                    .update_account(tx_to_chargeback.client_id, |account| {
+                        account.held -= amount;
+                        account.total -= amount;
+                        account.locked = true;
+                    });
+            }
+        }
     }
 }
 
-fn fetch_transaction(transaction_id: u32) -> Option<Transaction> {
+fn fetch_and_update_transaction_disputed_state(
+    transaction_id: u32,
+    transaction_type: TransactionType,
+) -> Option<Transaction> {
     TRANSACTIONS
         .lock()
-        .map(|transactions| {
-            let trans = transactions.get(&transaction_id);
-            trans.cloned()
+        .map(|mut transactions| {
+            let transaction_opt = transactions.entry(transaction_id);
+
+            return match transaction_opt {
+                Entry::Occupied(mut entry) => {
+                    let transaction = entry.get_mut();
+
+                    match transaction_type {
+                        TransactionType::Dispute => {
+                            if transaction.is_disputed {
+                                return None;
+                            }
+
+                            transaction.is_disputed = true;
+                        }
+                        TransactionType::Resolve => {
+                            if !transaction.is_disputed {
+                                return None;
+                            }
+
+                            transaction.is_disputed = false;
+                        }
+                        TransactionType::Chargeback => {
+                            if !transaction.is_disputed {
+                                return None;
+                            }
+                        }
+                        _ => return None,
+                    }
+
+                    Some(transaction.clone())
+                }
+                Entry::Vacant(_) => None,
+            };
         })
         .expect("Error locking transactions")
 }
 
+// Assumption: The transaction ID is unique for each entry. This approach doesn't handle duplicates.
 fn commit_transaction(transaction: Transaction) {
     TRANSACTIONS
         .lock()
