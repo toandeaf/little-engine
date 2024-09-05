@@ -1,21 +1,17 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
-
-use lazy_static::lazy_static;
+use std::sync::{Arc, Mutex};
 
 use crate::engines::account::AccountEngine;
 use crate::engines::models::{Account, ClientId};
 
-lazy_static! {
-    pub static ref CLIENT_ACCOUNTS: Mutex<HashMap<ClientId, Account>> = Mutex::new(HashMap::new());
-}
-
 #[derive(Clone)]
-pub struct InMemoryAccountEngine;
+pub struct InMemoryAccountEngine {
+    accounts: Arc<Mutex<HashMap<ClientId, Account>>>,
+}
 
 impl AccountEngine for InMemoryAccountEngine {
     fn update_account(&self, client_id: ClientId, account_function: impl Fn(&mut Account)) {
-        CLIENT_ACCOUNTS
+        self.accounts
             .lock()
             .map(|mut accounts| {
                 let account = accounts.entry(client_id).or_insert_with(Account::new);
@@ -28,7 +24,7 @@ impl AccountEngine for InMemoryAccountEngine {
     }
 
     fn generate_accounts_summary(&self) -> HashMap<ClientId, Account> {
-        CLIENT_ACCOUNTS
+        self.accounts
             .lock()
             .map(|accounts| accounts.clone())
             .expect("Error locking client accounts")
@@ -37,6 +33,8 @@ impl AccountEngine for InMemoryAccountEngine {
 
 impl InMemoryAccountEngine {
     pub fn new() -> Self {
-        InMemoryAccountEngine
+        InMemoryAccountEngine {
+            accounts: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
