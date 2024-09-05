@@ -34,6 +34,8 @@ I've tried to keep the architecture pretty simple and grouped the required funct
 
 ## Future Improvements
 
-* Engine modularity: This is a current WIP and is available in the `feature/engine_modularity` branch. The idea is to
-  define and leverage a Trait based approach for the engines to allow for more flexibility and easier testing.
+~~* Engine modularity: This is a current WIP and is available in the `feature/engine_modularity` branch. The idea is to
+define and leverage a Trait based approach for the engines to allow for more flexibility and easier testing.~~ Done!
+
+* Move to a queue based ingestion approach.
 
