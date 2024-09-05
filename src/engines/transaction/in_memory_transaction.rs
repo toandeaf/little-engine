@@ -37,7 +37,7 @@ where
                 // Assumption: Anything other than deposits or withdrawals are not considered true "transactions"
                 // given that their tx ID field references another transaction other than their own.
                 TransactionType::Deposit | TransactionType::Withdrawal => {
-                    commit_transaction(transaction)
+                    self.commit_transaction(transaction)
                 }
                 _ => {}
             }
@@ -78,8 +78,8 @@ where
     }
 
     fn handle_dispute(&self, transaction: &Transaction) {
-        let tx_to_dispute_opt =
-            fetch_and_update_transaction_disputed_state(transaction.id, TransactionType::Dispute);
+        let tx_to_dispute_opt = self
+            .fetch_and_update_transaction_disputed_state(transaction.id, TransactionType::Dispute);
 
         if let Some(tx_to_dispute) = tx_to_dispute_opt {
             if let Some(amount) = tx_to_dispute.amount {
@@ -93,8 +93,8 @@ where
     }
 
     fn handle_resolve(&self, transaction: &Transaction) {
-        let tx_to_resolve_opt =
-            fetch_and_update_transaction_disputed_state(transaction.id, TransactionType::Resolve);
+        let tx_to_resolve_opt = self
+            .fetch_and_update_transaction_disputed_state(transaction.id, TransactionType::Resolve);
 
         if let Some(tx_to_resolve) = tx_to_resolve_opt {
             if let Some(amount) = tx_to_resolve.amount {
@@ -108,7 +108,7 @@ where
     }
 
     fn handle_chargeback(&self, transaction: &Transaction) {
-        let tx_to_chargeback_opt = fetch_and_update_transaction_disputed_state(
+        let tx_to_chargeback_opt = self.fetch_and_update_transaction_disputed_state(
             transaction.id,
             TransactionType::Chargeback,
         );
@@ -124,58 +124,64 @@ where
             }
         }
     }
-}
 
-fn fetch_and_update_transaction_disputed_state(
-    transaction_id: u32,
-    transaction_type: TransactionType,
-) -> Option<Transaction> {
-    TRANSACTIONS
-        .lock()
-        .map(|mut transactions| {
-            let transaction_opt = transactions.entry(transaction_id);
+    fn fetch_and_update_transaction_disputed_state(
+        &self,
+        transaction_id: u32,
+        transaction_type: TransactionType,
+    ) -> Option<Transaction> {
+        TRANSACTIONS
+            .lock()
+            .map(|mut transactions| {
+                let transaction_opt = transactions.entry(transaction_id);
 
-            return match transaction_opt {
-                Entry::Occupied(mut entry) => {
-                    let transaction = entry.get_mut();
+                return match transaction_opt {
+                    Entry::Occupied(mut entry) => {
+                        let transaction = entry.get_mut();
 
-                    match transaction_type {
-                        TransactionType::Dispute => {
-                            if transaction.is_disputed {
-                                return None;
-                            }
-
-                            transaction.is_disputed = true;
-                        }
-                        TransactionType::Resolve => {
-                            if !transaction.is_disputed {
-                                return None;
-                            }
-
-                            transaction.is_disputed = false;
-                        }
-                        TransactionType::Chargeback => {
-                            if !transaction.is_disputed {
-                                return None;
-                            }
-                        }
-                        _ => return None,
+                        self.return_transaction_if_appropriate(transaction_type, transaction)
                     }
+                    Entry::Vacant(_) => None,
+                };
+            })
+            .expect("Error locking transactions")
+    }
 
-                    Some(transaction.clone())
+    fn return_transaction_if_appropriate(
+        &self,
+        transaction_type: TransactionType,
+        transaction: &mut Transaction,
+    ) -> Option<Transaction> {
+        match transaction_type {
+            TransactionType::Dispute => {
+                if !transaction.is_disputed {
+                    transaction.is_disputed = true;
+                    return Some(transaction.clone());
                 }
-                Entry::Vacant(_) => None,
-            };
-        })
-        .expect("Error locking transactions")
-}
+            }
+            TransactionType::Resolve => {
+                if transaction.is_disputed {
+                    transaction.is_disputed = false;
+                    return Some(transaction.clone());
+                }
+            }
+            TransactionType::Chargeback => {
+                if transaction.is_disputed {
+                    return Some(transaction.clone());
+                }
+            }
+            _ => return None,
+        };
+        None
+    }
 
-// Assumption: The transaction ID is unique for each entry. This approach doesn't handle duplicates.
-fn commit_transaction(transaction: Transaction) {
-    TRANSACTIONS
-        .lock()
-        .map(|mut transactions| {
-            transactions.insert(transaction.id, transaction);
-        })
-        .expect("Error locking transactions");
+    // Assumption: The transaction ID is unique for each entry. This approach doesn't handle duplicates.
+    fn commit_transaction(&self, transaction: Transaction) {
+        TRANSACTIONS
+            .lock()
+            .map(|mut transactions| {
+                transactions.insert(transaction.id, transaction);
+            })
+            .expect("Error locking transactions");
+    }
 }

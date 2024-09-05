@@ -20,7 +20,6 @@ impl AccountEngine for InMemoryAccountEngine {
             .map(|mut accounts| {
                 let account = accounts.entry(client_id).or_insert_with(Account::new);
 
-                // TODO - is this necessary? Wasn't mentioned in the specs but feels like it should be
                 if !account.locked {
                     account_function(account);
                 }

@@ -33,7 +33,7 @@ impl CSVIngestionEngine {
         CSVIngestionEngine { csv_file_path }
     }
 
-    fn create_transaction_from_csv_record(&self, record: StringRecord) -> Option<Transaction> {
+    pub fn create_transaction_from_csv_record(&self, record: StringRecord) -> Option<Transaction> {
         let parsed_transaction_type = record.get(0)?;
 
         let transaction_type = match parsed_transaction_type {

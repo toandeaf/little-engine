@@ -41,7 +41,6 @@ impl CSVExportEngine {
         CSVExportEngine
     }
 
-    // TODO rework this
     fn format_float(&self, value: f64) -> String {
         if value.fract() == 0.0 {
             format!("{:.0}", value)
