@@ -26,7 +26,7 @@ impl ExportEngine for CSVExportEngine {
                     client: *client_id,
                     available: self.format_float(account.available),
                     held: self.format_float(account.held),
-                    total: self.format_float(account.total),
+                    total: self.format_float(account.held + account.available),
                     locked: account.locked,
                 })
                 .expect("Error serializing in_memory_account data");

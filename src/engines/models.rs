@@ -20,7 +20,6 @@ pub enum TransactionType {
 pub struct Account {
     pub(crate) available: f64,
     pub(crate) held: f64,
-    pub(crate) total: f64,
     pub(crate) locked: bool,
 }
 
@@ -29,7 +28,6 @@ impl Account {
         Self {
             available: 0.0,
             held: 0.0,
-            total: 0.0,
             locked: false,
         }
     }
